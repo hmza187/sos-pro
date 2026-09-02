@@ -10,8 +10,6 @@ jobs:
           unzip -o SosApp.zip
           rm SosApp.zip
           ls -la
-          if [ -d "SosApp" ]; then mv SosApp/*.; mv SosApp/.*. 2>/dev/null || true; rmdir SosApp; fi
-          ls -la
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
