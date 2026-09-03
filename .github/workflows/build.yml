@@ -81,8 +81,8 @@ jobs:
           }
           EOF
 
-            - name: Build with Gradle
-        uses: gradle/gradle-build-action@v2
+                  - name: Build with Gradle
+        uses: gradle/gradle-build-action@v3
         with:
           gradle-version: 8.5
           arguments: assembleDebug
