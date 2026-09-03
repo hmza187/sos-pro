@@ -19,29 +19,27 @@ jobs:
           rm -rf app gradle build.gradle.kts settings.gradle.kts
           mkdir -p app/src/main/java/com/hmza/sospro
           mkdir -p gradle/wrapper
-          echo "pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
-          rootProject.name = \"SosApp\"
-          include(\":app\")" > settings.gradle.kts
-          echo "plugins { id(\"com.android.application\") version \"8.2.2\" apply false; id(\"org.jetbrains.kotlin.android\") version \"1.9.22\" apply false }" > build.gradle.kts
-          echo "distributionBase=GRADLE_USER_HOME
+          rootProject.name = "SosApp"
+          include(":app")' > settings.gradle.kts
+          echo 'plugins { id("com.android.application") version "8.2.2" apply false; id("org.jetbrains.kotlin.android") version "1.9.22" apply false }' > build.gradle.kts
+          echo 'distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
           distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
           zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists" > gradle/wrapper/gradle-wrapper.properties
+          zipStorePath=wrapper/dists' > gradle/wrapper/gradle-wrapper.properties
           echo 'plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
           android {
               namespace = "com.hmza.sospro"
-              compileSdk = 34
-              defaultConfig { applicationId = "com.hmza.sospro"; minSdk = 24; targetSdk = 34; versionCode = 1; versionName = "1.0" }
+              compileSdk = 33
+              defaultConfig { applicationId = "com.hmza.sospro"; minSdk = 24; targetSdk = 33; versionCode = 1; versionName = "1.0" }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = "17" }
           }
           dependencies {
               implementation("androidx.core:core-ktx:1.12.0")
-              implementation("androidx.appcompat:appcompat:1.6.1")
-              implementation("com.google.android.material:material:1.11.0")
           }' > app/build.gradle.kts
           echo '<?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -52,17 +50,17 @@ jobs:
               </application>
           </manifest>' > app/src/main/AndroidManifest.xml
           echo 'package com.hmza.sospro
+          import android.app.Activity
           import android.os.Bundle
-          import androidx.appcompat.app.AppCompatActivity
           import android.widget.Button
           import android.widget.Toast
           import android.widget.LinearLayout
           import android.view.Gravity
-          class MainActivity : AppCompatActivity() {
+          class MainActivity : Activity() {
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(50,50,50,50) }
-                  val btn = Button(this).apply { text = "SOS GONDER"; textSize = 24f; setOnClickListener { Toast.makeText(this@MainActivity, "SOS Hazir! APK Calisiyor!", Toast.LENGTH_LONG).show() } }
+                  val btn = Button(this).apply { text = "SOS GONDER"; textSize = 24f; setOnClickListener { Toast.makeText(this@MainActivity, "APK OLDU KRAL!", Toast.LENGTH_LONG).show() } }
                   layout.addView(btn)
                   setContentView(layout)
               }
