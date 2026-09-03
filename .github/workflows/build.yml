@@ -39,11 +39,10 @@ jobs:
               kotlinOptions { jvmTarget = "17" }
           }
           dependencies {
-              implementation("androidx.core:core-ktx:1.12.0")
           }' > app/build.gradle.kts
           echo '<?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:allowBackup="true" android:label="Sos Pro" android:theme="@android:style/Theme.Material.Light">
+              <application android:allowBackup="true" android:label="Sos Pro">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
                   </activity>
@@ -59,8 +58,8 @@ jobs:
           class MainActivity : Activity() {
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(50,50,50,50) }
-                  val btn = Button(this).apply { text = "SOS GONDER"; textSize = 24f; setOnClickListener { Toast.makeText(this@MainActivity, "APK OLDU KRAL!", Toast.LENGTH_LONG).show() } }
+                  val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(100,100,100,100) }
+                  val btn = Button(this).apply { text = "SOS GONDER"; textSize = 30f; setOnClickListener { Toast.makeText(this@MainActivity, "CALISTI!", Toast.LENGTH_LONG).show() } }
                   layout.addView(btn)
                   setContentView(layout)
               }
