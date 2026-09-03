@@ -14,30 +14,22 @@ jobs:
           distribution: 'temurin'
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
       - name: Create Project Files
         run: |
-          rm -rf app gradle build.gradle.kts settings.gradle.kts gradlew
+          rm -rf app gradle build.gradle.kts settings.gradle.kts
           mkdir -p app/src/main/java/com/hmza/sospro
           mkdir -p gradle/wrapper
-          cat > settings.gradle.kts <<'EOF'
-          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          echo "pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
-          rootProject.name = "SosApp"
-          include(":app")
-          EOF
-          cat > build.gradle.kts <<'EOF'
-          plugins { id("com.android.application") version "8.2.2" apply false; id("org.jetbrains.kotlin.android") version "1.9.22" apply false }
-          EOF
-          cat > gradle/wrapper/gradle-wrapper.properties <<'EOF'
-          distributionBase=GRADLE_USER_HOME
+          rootProject.name = \"SosApp\"
+          include(\":app\")" > settings.gradle.kts
+          echo "plugins { id(\"com.android.application\") version \"8.2.2\" apply false; id(\"org.jetbrains.kotlin.android\") version \"1.9.22\" apply false }" > build.gradle.kts
+          echo "distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
           distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
           zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-          cat > app/build.gradle.kts <<'EOF'
-          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+          zipStorePath=wrapper/dists" > gradle/wrapper/gradle-wrapper.properties
+          echo 'plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
           android {
               namespace = "com.hmza.sospro"
               compileSdk = 34
@@ -50,20 +42,16 @@ jobs:
               implementation("androidx.core:core-ktx:1.12.0")
               implementation("androidx.appcompat:appcompat:1.6.1")
               implementation("com.google.android.material:material:1.11.0")
-          }
-          EOF
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
+          }' > app/build.gradle.kts
+          echo '<?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application android:allowBackup="true" android:label="Sos Pro" android:theme="@android:style/Theme.Material.Light">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
                   </activity>
               </application>
-          </manifest>
-          EOF
-          cat > app/src/main/java/com/hmza/sospro/MainActivity.kt <<'EOF'
-          package com.hmza.sospro
+          </manifest>' > app/src/main/AndroidManifest.xml
+          echo 'package com.hmza.sospro
           import android.os.Bundle
           import androidx.appcompat.app.AppCompatActivity
           import android.widget.Button
@@ -78,15 +66,12 @@ jobs:
                   layout.addView(btn)
                   setContentView(layout)
               }
-          }
-          EOF
-
-                  - name: Build with Gradle
+          }' > app/src/main/java/com/hmza/sospro/MainActivity.kt
+      - name: Build with Gradle
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: 8.5
           arguments: assembleDebug
-          
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
