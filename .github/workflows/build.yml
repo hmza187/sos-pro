@@ -1,76 +1,39 @@
-name: Build APK
+name: APK Derle
+
 on:
   push:
-    branches: [ main ]
+    branches: [ "main", "master" ]
+  workflow_dispatch: {}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 17
+      - name: Kodu indir
+        uses: actions/checkout@v4
+
+      - name: Zip'i aç
+        run: unzip -o SosApp.zip -d .
+
+      - name: JDK 17 kur
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
-      - name: Setup Android SDK
+          java-version: '17'
+
+      - name: Android SDK komut satırı araçlarını kur
         uses: android-actions/setup-android@v3
-      - name: Create Project Files
-        run: |
-          rm -rf app gradle build.gradle.kts settings.gradle.kts
-          mkdir -p app/src/main/java/com/hmza/sospro
-          mkdir -p gradle/wrapper
-          echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
-          rootProject.name = "SosApp"
-          include(":app")' > settings.gradle.kts
-          echo 'plugins { id("com.android.application") version "8.2.2" apply false; id("org.jetbrains.kotlin.android") version "1.9.22" apply false }' > build.gradle.kts
-          echo 'distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists' > gradle/wrapper/gradle-wrapper.properties
-          echo 'plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
-          android {
-              namespace = "com.hmza.sospro"
-              compileSdk = 33
-              defaultConfig { applicationId = "com.hmza.sospro"; minSdk = 24; targetSdk = 33; versionCode = 1; versionName = "1.0" }
-              buildTypes { release { isMinifyEnabled = false } }
-              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-              kotlinOptions { jvmTarget = "17" }
-          }
-          dependencies {
-          }' > app/build.gradle.kts
-          echo '<?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:allowBackup="true" android:label="Sos Pro">
-                  <activity android:name=".MainActivity" android:exported="true">
-                      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
-                  </activity>
-              </application>
-          </manifest>' > app/src/main/AndroidManifest.xml
-          echo 'package com.hmza.sospro
-          import android.app.Activity
-          import android.os.Bundle
-          import android.widget.Button
-          import android.widget.Toast
-          import android.widget.LinearLayout
-          import android.view.Gravity
-          class MainActivity : Activity() {
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(100,100,100,100) }
-                  val btn = Button(this).apply { text = "SOS GONDER"; textSize = 30f; setOnClickListener { Toast.makeText(this@MainActivity, "CALISTI!", Toast.LENGTH_LONG).show() } }
-                  layout.addView(btn)
-                  setContentView(layout)
-              }
-          }' > app/src/main/java/com/hmza/sospro/MainActivity.kt
-      - name: Build with Gradle
-        uses: gradle/gradle-build-action@v3
-        with:
-          gradle-version: 8.5
-          arguments: assembleDebug
-      - name: Upload APK
+
+      - name: Gradle'ı kur
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Debug APK derle
+        run: gradle -p SosApp assembleDebug --stacktrace
+
+      - name: APK'yı yükle (Artifacts)
         uses: actions/upload-artifact@v4
         with:
-          name: SosApp-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: sos-app-debug-apk
+          path: SosApp/app/build/outputs/apk/debug/app-debug.apk
+          
