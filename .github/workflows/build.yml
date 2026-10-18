@@ -1,4 +1,4 @@
-name: MCHosting V10 - Gradlew Yok Fix
+name: MCHosting V11 - Settings Fix
 
 on:
   workflow_dispatch:
@@ -14,18 +14,14 @@ jobs:
       - name: ZIP Ac
         run: |
           for z in *.zip; do [ -f "$z" ] && unzip -o "$z" && rm "$z"; done || true
-          ls -la
-          echo "=== ICERIK ==="
-          find . -type f -name "*.gradle" | head -20
-          ls -la MCHosting/ 2>/dev/null || true
-          ls -la SosApp/ 2>/dev/null || true
+          ls -la MCHosting/ || true
 
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Gradle Kur - Wrapper yoksa
+      - name: Gradle Kur
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: 7.6.3
@@ -38,21 +34,72 @@ jobs:
           yes | sdkmanager --licenses || true
           sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33" || true
 
+      - name: Settings.gradle Duzelt
+        run: |
+          echo "=== Onceki settings.gradle ==="
+          cat MCHosting/settings.gradle || cat settings.gradle || true
+          echo ""
+          echo "=== Yeni settings.gradle yaziliyor ==="
+          # MCHosting icin duzgun settings.gradle
+          cat > MCHosting/settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "MCHosting"
+          include ':app'
+          EOF
+          cat MCHosting/settings.gradle
+          
+          # Root settings.gradle de varsa duzelt
+          if [ -f "settings.gradle" ]; then
+            cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "sos-pro"
+          include ':MCHosting:app'
+          EOF
+          fi
+
       - name: Proje Hazirla
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
-          echo "sdk.dir=$ANDROID_HOME" | tee local.properties
-          echo "sdk.dir=$ANDROID_HOME" | tee MCHosting/local.properties 2>/dev/null || true
-          echo "sdk.dir=$ANDROID_HOME" | tee SosApp/local.properties 2>/dev/null || true
-          find . -name "local.properties" -exec cat {} \; 2>/dev/null || true
+          echo "sdk.dir=$ANDROID_HOME" | tee local.properties MCHosting/local.properties
           
-          # Hangi klasor gercek proje? settings.gradle olan
-          for d in . MCHosting SosApp MCHosting/* SosApp/*; do
-            if [ -f "$d/settings.gradle" ] || [ -f "$d/settings.gradle.kts" ] || [ -f "$d/app/build.gradle" ]; then
-              echo "Proje bulundu: $d"
-              ls -la "$d" | head -20
-            fi
-          done
+          # app/build.gradle dataBinding fix
+          if [ -f "MCHosting/app/build.gradle" ] && ! grep -q "dataBinding" MCHosting/app/build.gradle; then
+            python3 <<PY
+          import pathlib
+          p=pathlib.Path("MCHosting/app/build.gradle")
+          s=p.read_text()
+          if "buildFeatures" not in s:
+              s=s.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }",1)
+              p.write_text(s)
+              print("added buildFeatures to MCHosting/app/build.gradle")
+          PY
+          fi
 
       - name: APK Derle
         run: |
@@ -60,44 +107,14 @@ jobs:
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
           
-          # Gercek proje kokunu bul
-          if [ -f "MCHosting/app/build.gradle" ]; then
-            ROOT="MCHosting"
-          elif [ -f "SosApp/app/build.gradle" ]; then
-            ROOT="SosApp"
-          elif [ -f "app/build.gradle" ]; then
-            ROOT="."
-          else
-            ROOT=$(find . -name "app" -type d | head -1 | xargs dirname)
-          fi
-          
-          echo "ROOT=$ROOT"
-          cd "$ROOT"
+          # ROOT MCHosting
+          cd MCHosting
           pwd
           ls -la
+          echo "=== build.gradle ==="
+          cat build.gradle | head -30
           
-          # dataBinding fix
-          APP="app/build.gradle"
-          if [ -f "$APP" ] && ! grep -q "dataBinding" "$APP"; then
-            echo "dataBinding ekleniyor $APP"
-            python3 <<PY
-          import pathlib
-          p=pathlib.Path("app/build.gradle")
-          s=p.read_text()
-          if "buildFeatures" not in s:
-              s=s.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }",1)
-              p.write_text(s)
-          PY
-          fi
-          
-          # gradlew varsa onu, yoksa gradle
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleDebug --stacktrace --no-daemon
-          else
-            echo "gradlew yok, gradle komutu kullaniliyor"
-            gradle assembleDebug --stacktrace --no-daemon
-          fi
+          gradle assembleDebug --stacktrace --no-daemon
 
       - name: APK Yukle
         if: always()
@@ -108,3 +125,4 @@ jobs:
             **/app/build/outputs/apk/debug/*.apk
             **/build/outputs/apk/debug/*.apk
             **/*.apk
+           
