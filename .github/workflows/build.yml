@@ -1,4 +1,4 @@
-name: MCHosting APK Yapici V4
+name: MCHosting APK V5 - Kesin Cozum
 
 on:
   workflow_dispatch:
@@ -16,9 +16,8 @@ jobs:
       - name: ZIP'i ac
         run: |
           ls -la
-          for z in *.zip; do [ -e "$z" ] && echo "Aciliyor: $z" && unzip -o "$z" && rm "$z"; done
-          for z in **/*.zip; do [ -e "$z" ] && echo "ic zip: $z" && unzip -o "$z" -d $(dirname "$z") && rm "$z"; done || true
-          ls -la
+          for z in *.zip; do [ -e "$z" ] && unzip -o "$z" && rm "$z"; done
+          for z in **/*.zip; do [ -e "$z" ] && unzip -o "$z" -d $(dirname "$z") && rm "$z"; done || true
           find . -name "gradlew" | head -5
 
       - name: Java 17 Kur
@@ -27,25 +26,37 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Android SDK Kur
-        uses: android-actions/setup-android@v3
+      - name: Android SDK Kur - MANUEL
+        run: |
+          echo "SDK yolu ayarlaniyor..."
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls $ANDROID_HOME/cmdline-tools/latest/bin/
+          echo "Lisanslar kabul ediliyor..."
+          yes | sdkmanager --licenses || true
+          echo "Paketler kuruluyor..."
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33"
+          echo "Bitti!"
 
       - name: Gradle Cache
         uses: gradle/gradle-build-action@v3
 
       - name: dataBinding Fix
         run: |
-          FILE=$(find . -name "build.gradle" -type f | xargs grep -l "com.android.application" | head -1)
-          echo "App build.gradle: $FILE"
-          if [ -f "$FILE" ]; then
+          FILE=$(find . -type f -name "build.gradle" | xargs grep -l "com.android.application" 2>/dev/null | head -1)
+          echo "File: $FILE"
+          if [ -n "$FILE" ] && [ -f "$FILE" ]; then
+            cat "$FILE" | head -100
             if ! grep -q "dataBinding" "$FILE"; then
-              echo "dataBinding ekleniyor..."
-              # android { sonrasi
-              perl -i -pe 'BEGIN{undef $/;} s/android\s*\{/android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }/s' "$FILE" || true
-              # alternatif sed
-              grep -q "buildFeatures" "$FILE" || sed -i '/^android {/a \    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }' "$FILE"
+              echo "Fix uygulaniyor..."
+              # android blogu icine ekle
+              awk '
+                /^android \{/ {print; print "    buildFeatures {"; print "        dataBinding true"; print "        viewBinding true"; print "    }"; next}1
+              ' "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
             fi
-            cat "$FILE"
+            cat "$FILE" | head -150
           fi
 
       - name: Gradle'a izin ver
@@ -53,15 +64,19 @@ jobs:
 
       - name: APK Derle
         run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
           ROOT=$(find . -name "gradlew" | head -1 | xargs dirname)
-          echo "Proje kok: $ROOT"
+          echo "ROOT=$ROOT"
           cd "$ROOT"
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace --info
 
       - name: APK'yi Yükle
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: MCHosting-apk
           path: |
             **/app/build/outputs/apk/debug/*.apk
             **/build/outputs/apk/debug/*.apk
+            **/*.apk
