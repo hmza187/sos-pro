@@ -1,4 +1,4 @@
-name: MCHosting APK Yapici V3
+name: MCHosting APK Yapici V4
 
 on:
   workflow_dispatch:
@@ -16,17 +16,10 @@ jobs:
       - name: ZIP'i ac
         run: |
           ls -la
-          # tum zipleri ac
-          for z in *.zip; do
-            [ -e "$z" ] && echo "Aciliyor: $z" && unzip -o "$z" && rm "$z"
-          done
-          # ic ice zip varsa
-          for z in **/*.zip; do
-            [ -e "$z" ] && unzip -o "$z" -d $(dirname "$z") && rm "$z"
-          done || true
+          for z in *.zip; do [ -e "$z" ] && echo "Aciliyor: $z" && unzip -o "$z" && rm "$z"; done
+          for z in **/*.zip; do [ -e "$z" ] && echo "ic zip: $z" && unzip -o "$z" -d $(dirname "$z") && rm "$z"; done || true
           ls -la
-          # proje nerede?
-          find . -name "gradlew" | head -20
+          find . -name "gradlew" | head -5
 
       - name: Java 17 Kur
         uses: actions/setup-java@v4
@@ -35,27 +28,24 @@ jobs:
           java-version: '17'
 
       - name: Android SDK Kur
-        run: |
-          echo "SDK kuruluyor..."
-          yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33"
+        uses: android-actions/setup-android@v3
 
       - name: Gradle Cache
         uses: gradle/gradle-build-action@v3
 
       - name: dataBinding Fix
         run: |
-          find . -name "build.gradle" -path "*/app/*" | head -5
-          FILE=$(find . -name "build.gradle" | grep app | head -1)
-          echo "Dosya: $FILE"
+          FILE=$(find . -name "build.gradle" -type f | xargs grep -l "com.android.application" | head -1)
+          echo "App build.gradle: $FILE"
           if [ -f "$FILE" ]; then
-            cat "$FILE"
             if ! grep -q "dataBinding" "$FILE"; then
-              echo "Fix ekleniyor..."
-              # android { dan sonra ekle
-              sed -i '/^android {/a \    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }' "$FILE"
-              cat "$FILE"
+              echo "dataBinding ekleniyor..."
+              # android { sonrasi
+              perl -i -pe 'BEGIN{undef $/;} s/android\s*\{/android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }/s' "$FILE" || true
+              # alternatif sed
+              grep -q "buildFeatures" "$FILE" || sed -i '/^android {/a \    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }' "$FILE"
             fi
+            cat "$FILE"
           fi
 
       - name: Gradle'a izin ver
@@ -63,7 +53,6 @@ jobs:
 
       - name: APK Derle
         run: |
-          # proje kokunu bul
           ROOT=$(find . -name "gradlew" | head -1 | xargs dirname)
           echo "Proje kok: $ROOT"
           cd "$ROOT"
