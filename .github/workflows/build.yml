@@ -1,4 +1,4 @@
-name: MCHosting V8 - Gradle Fix
+name: MCHosting V9 - Orijinal Surum Fix
 
 on:
   workflow_dispatch:
@@ -13,9 +13,9 @@ jobs:
 
       - name: ZIP Ac
         run: |
+          for z in *.zip; do [ -f "$z" ] && unzip -o "$z" && rm "$z"; done || true
           ls -la
-          for z in *.zip; do [ -f "$z" ] && unzip -o "$z"; done
-          ls -la
+          find . -name "gradle-wrapper.properties" -exec cat {} \;
 
       - uses: actions/setup-java@v4
         with:
@@ -28,60 +28,52 @@ jobs:
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
           yes | sdkmanager --licenses || true
-          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33" || true
 
-      - name: Versiyonlari Duzelt
+      - name: Versiyonlari Birlestir - 7.4.2 Sabitle
         run: |
-          echo "=== Onceki surumler ==="
-          cat gradle/wrapper/gradle-wrapper.properties 2>/dev/null || find . -name "gradle-wrapper.properties" -exec cat {} \;
-          find . -name "build.gradle" | xargs grep -h "com.android.application" | head -5
-          find . -name "build.gradle" | xargs grep -h "com.android.tools.build:gradle" | head -5
+          echo "=== Tum AGP surumleri 7.4.2 yapiliyor ==="
+          # Projedeki tum AGP versiyonlarini 7.4.2 yap
+          grep -r "com.android.tools.build:gradle" --include="*.gradle" . | head -20
+          find . -name "*.gradle" -type f -exec sed -i -E "s/com.android.tools.build:gradle:[0-9.]+/com.android.tools.build:gradle:7.4.2/g" {} \; || true
+          find . -name "*.gradle" -type f -exec sed -i -E "s/version '7.4.2'/version '7.4.2'/g" {} \; || true
+          # plugins blokundaki AGP
+          find . -name "*.gradle" -type f -exec sed -i -E "s/id 'com.android.application' version '[0-9.]+'/id 'com.android.application' version '7.4.2'/g" {} \; || true
+          grep -r "com.android.tools.build:gradle" --include="*.gradle" . | head -20
           
-          echo "=== Gradle Wrapper 8.9 yapiliyor ==="
-          # wrapper properties guncelle
-          find . -name "gradle-wrapper.properties" -exec sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.9-bin.zip|' {} \;
-          
-          echo "=== AGP 8.4.2 yapiliyor ==="
-          # top-level build.gradle deki AGP surumunu guncelle
-          find . -maxdepth 4 -name "build.gradle" | xargs grep -l "com.android.tools.build:gradle" | while read f; do
-            echo "Fix $f"
-            sed -i -E "s/com.android.tools.build:gradle:[0-9.]+/com.android.tools.build:gradle:8.4.2/g" "$f"
-            cat "$f" | head -50
-          done
-          
-          # libs.versions.toml varsa
-          find . -name "libs.versions.toml" -exec sed -i -E "s/androidGradlePlugin = \"[0-9.]+\"/androidGradlePlugin = \"8.4.2\"/; s/agp = \"[0-9.]+\"/agp = \"8.4.2\"/" {} \; || true
-          
-          cat gradle/wrapper/gradle-wrapper.properties 2>/dev/null
-          find . -name "gradle-wrapper.properties" -exec cat {} \; | head -20
+          echo "=== Gradle Wrapper 7.6.3 sabit ==="
+          find . -name "gradle-wrapper.properties" -exec sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.3-bin.zip|' {} \; || true
+          find . -name "gradle-wrapper.properties" -exec cat {} \; || true
 
       - name: Proje Hazirla
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
-          find . -name "gradlew" -type f -exec chmod +x {} \;
-          find . -name "gradlew" -type f -exec sh -c 'dir=$(dirname "$1"); echo "sdk.dir=$ANDROID_HOME" > "$dir/local.properties"' _ {} \;
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          find . -name "gradlew" -type f -exec chmod +x {} \; || true
+          find . -name "gradlew" -type f | while read f; do dir=$(dirname "$f"); echo "sdk.dir=$ANDROID_HOME" > "$dir/local.properties"; done
+          echo "sdk.dir=$ANDROID_HOME" > local.properties || true
           
-          # buildFeatures fix - daha temiz
+          # dataBinding fix - AGP 7.x icin ESKI syntax
           APP=$(find . -type f -path "*app/build.gradle" | head -1)
-          if [ -z "$APP" ]; then APP=$(grep -rl "com.android.application" --include="*.gradle" . | head -1); fi
           echo "APP=$APP"
           if [ -f "$APP" ]; then
-            # dataBinding zaten varsa elleme, yoksa ekle
+            echo "=== Onceki APP ==="
+            cat "$APP" | head -100
+            # buildFeatures varsa sil, eski dataBinding ekle
             if ! grep -q "dataBinding" "$APP"; then
               python3 <<PY
           import pathlib
-          f=pathlib.Path("$APP")
-          s=f.read_text()
+          p=pathlib.Path("$APP")
+          s=p.read_text()
+          # eski buildFeatures eklemesini temizle
+          # AGP 7.x icin dogru syntax: buildFeatures { dataBinding true } CALISIR ama bazen eski enabled lazim
+          # En uyumlu: android icine buildFeatures ekle
           if "buildFeatures" not in s:
-              s=s.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }",1)
-              f.write_text(s)
+              s=s.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }", 1)
+              p.write_text(s)
               print("added buildFeatures")
           PY
             fi
-            # enableV2 gibi eski seyleri temizle
-            sed -i '/dataBinding {/,/}/d' "$APP" || true
-            sed -i '/android.databinding.enabled/d' "$APP" || true
+            echo "=== Sonraki APP ==="
             cat "$APP" | head -200
           fi
 
@@ -91,10 +83,13 @@ jobs:
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
           GRADLEW=$(find . -type f -name "gradlew" | head -1)
+          echo "GRADLEW=$GRADLEW"
           ROOT=$(dirname "$GRADLEW")
           echo "ROOT=$ROOT"
           cd "$ROOT"
-          ./gradlew assembleDebug --stacktrace --warning-mode all
+          pwd
+          ls -la
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: APK Yukle
         if: always()
