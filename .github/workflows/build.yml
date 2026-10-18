@@ -1,4 +1,4 @@
-name: MCHosting V12 - useAndroidX Fix
+name: MCHosting V13 - FINAL FINAL
 
 on:
   workflow_dispatch:
@@ -10,15 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: ZIP Ac
-        run: for z in *.zip; do [ -f "$z" ] && unzip -o "$z" && rm "$z"; done || true
+        run: |
+          for z in *.zip; do [ -f "$z" ] && unzip -o "$z" && rm "$z"; done || true
+          ls -la
+          echo "MCHosting icerik:"
+          ls -la MCHosting/ || true
 
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Gradle Kur
+      - name: Gradle 7.6.3 Kur
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: 7.6.3
@@ -26,14 +31,17 @@ jobs:
       - name: SDK Kur
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
-          export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
           yes | sdkmanager --licenses || true
-          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33" "build-tools;30.0.3" || true
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "build-tools;30.0.3" "platforms;android-33" || true
 
-      - name: Settings + Properties Duzelt
+      - name: TUM FIXLER BIR ARADA
         run: |
-          cat > MCHosting/settings.gradle <<'EOF'
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          ROOT="MCHosting"
+          
+          # 1. settings.gradle duzelt
+          cat > $ROOT/settings.gradle <<'EOF'
           pluginManagement {
               repositories {
                   google()
@@ -52,22 +60,32 @@ jobs:
           include ':app'
           EOF
           
-          # === EN ONEMLI FIX BURASI ===
-          cat > MCHosting/gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          # 2. gradle.properties - EN ONEMLI
+          cat > $ROOT/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8
           android.useAndroidX=true
           android.enableJetifier=true
           android.suppressUnsupportedCompileSdk=34
-          android.nonTransitiveRClass=true
           EOF
           
-          cat MCHosting/gradle.properties
-          echo "sdk.dir=$ANDROID_HOME" | tee local.properties MCHosting/local.properties
-          echo "sdk.dir=/usr/local/lib/android/sdk" > MCHosting/local.properties
-
-      - name: dataBinding Fix
-        run: |
-          APP="MCHosting/app/build.gradle"
+          # 3. local.properties
+          echo "sdk.dir=$ANDROID_HOME" > $ROOT/local.properties
+          
+          # 4. gradlew yoksa olustur
+          if [ ! -f "$ROOT/gradlew" ]; then
+            echo "gradlew yok, olusturuluyor..."
+            cd $ROOT
+            gradle wrapper --gradle-version 7.6.3
+            cd ..
+          fi
+          
+          chmod +x $ROOT/gradlew || true
+          chmod +x $ROOT/gradle/wrapper/gradle-wrapper.jar 2>/dev/null || true
+          
+          # 5. dataBinding fix
+          APP="$ROOT/app/build.gradle"
+          echo "APP=$APP"
+          cat "$APP" | head -60
           if ! grep -q "dataBinding" "$APP"; then
             python3 <<PY
           import pathlib
@@ -76,9 +94,16 @@ jobs:
           if "buildFeatures" not in s:
               s=s.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }",1)
               p.write_text(s)
+              print("dataBinding eklendi")
           PY
           fi
-          cat "$APP" | head -100
+          
+          echo "=== FINAL KONTROLLER ==="
+          cat $ROOT/settings.gradle
+          cat $ROOT/gradle.properties
+          cat $ROOT/local.properties
+          ls -la $ROOT/
+          ls -la $ROOT/app/ | head -20
 
       - name: APK Derle
         run: |
@@ -86,7 +111,7 @@ jobs:
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
           cd MCHosting
-          gradle assembleDebug --stacktrace --no-daemon
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: APK Yukle
         if: always()
