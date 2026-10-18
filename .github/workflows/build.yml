@@ -1,4 +1,4 @@
-name: MCHosting APK V5 - Kesin Cozum
+name: MCHosting V6 - Final
 
 on:
   workflow_dispatch:
@@ -8,70 +8,88 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Kodu cek
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: ZIP'i ac
+      - name: ZIP'i ac ve Proje Bul
         run: |
+          set -x
+          pwd
           ls -la
-          for z in *.zip; do [ -e "$z" ] && unzip -o "$z" && rm "$z"; done
-          for z in **/*.zip; do [ -e "$z" ] && unzip -o "$z" -d $(dirname "$z") && rm "$z"; done || true
-          find . -name "gradlew" | head -5
+          for z in *.zip; do [ -f "$z" ] && unzip -o "$z" && rm "$z"; done
+          for z in **/*.zip; do [ -f "$z" ] && unzip -o "$z" -d $(dirname "$z") && rm "$z"; done || true
+          echo "=== GRADLEW LOKASYONLARI ==="
+          find . -name "gradlew" -type f
+          echo "=== BUILD.GRADLE ==="
+          find . -name "build.gradle" | head -10
 
-      - name: Java 17 Kur
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Android SDK Kur - MANUEL
+      - name: SDK Kur
         run: |
-          echo "SDK yolu ayarlaniyor..."
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls $ANDROID_HOME/cmdline-tools/latest/bin/
-          echo "Lisanslar kabul ediliyor..."
           yes | sdkmanager --licenses || true
-          echo "Paketler kuruluyor..."
           sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33"
-          echo "Bitti!"
 
       - name: Gradle Cache
         uses: gradle/gradle-build-action@v3
 
-      - name: dataBinding Fix
+      - name: local.properties ve Fix
         run: |
-          FILE=$(find . -type f -name "build.gradle" | xargs grep -l "com.android.application" 2>/dev/null | head -1)
-          echo "File: $FILE"
-          if [ -n "$FILE" ] && [ -f "$FILE" ]; then
-            cat "$FILE" | head -100
-            if ! grep -q "dataBinding" "$FILE"; then
-              echo "Fix uygulaniyor..."
-              # android blogu icine ekle
-              awk '
-                /^android \{/ {print; print "    buildFeatures {"; print "        dataBinding true"; print "        viewBinding true"; print "    }"; next}1
-              ' "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
-            fi
-            cat "$FILE" | head -150
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          find . -name "local.properties" -exec cat {} \;
+          # En gercek proje kokunu bul ve oraya da kopyala
+          GRADLEW=$(find . -name "gradlew" -type f | head -1)
+          ROOT=$(dirname "$GRADLEW")
+          echo "ROOT=$ROOT"
+          echo "sdk.dir=$ANDROID_HOME" > "$ROOT/local.properties"
+          cat "$ROOT/local.properties"
+          # buildFeatures fix - sadece app modulu
+          APP_BUILD=$(find . -path "*/app/build.gradle" | head -1)
+          if [ -z "$APP_BUILD" ]; then APP_BUILD=$(find . -name "build.gradle" | xargs grep -l "com.android.application" 2>/dev/null | head -1); fi
+          echo "APP_BUILD=$APP_BUILD"
+          if [ -f "$APP_BUILD" ] && ! grep -q "dataBinding" "$APP_BUILD"; then
+            echo "Fix uygulaniyor: $APP_BUILD"
+            # yedek al
+            cp "$APP_BUILD" "$APP_BUILD.bak"
+            # android blokundan sonra ekle - daha guvenli
+            python3 <<PY
+          import pathlib
+          p = pathlib.Path("$APP_BUILD")
+          t = p.read_text()
+          if "buildFeatures" not in t:
+              t = t.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }", 1)
+              p.write_text(t)
+              print("fixed")
+          else:
+              print("already has buildFeatures")
+          PY
+            cat "$APP_BUILD" | head -200
           fi
-
-      - name: Gradle'a izin ver
-        run: find . -name "gradlew" -exec chmod +x {} \;
 
       - name: APK Derle
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=$ANDROID_HOME
-          ROOT=$(find . -name "gradlew" | head -1 | xargs dirname)
-          echo "ROOT=$ROOT"
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+          GRADLEW=$(find . -name "gradlew" -type f | head -1)
+          ROOT=$(dirname "$GRADLEW")
+          echo "Gradlew: $GRADLEW"
+          echo "Root: $ROOT"
+          ls -la "$ROOT"
+          chmod +x "$GRADLEW"
           cd "$ROOT"
-          ./gradlew assembleDebug --stacktrace --info
+          pwd
+          ls -la
+          ./gradlew assembleDebug --stacktrace
 
-      - name: APK'yi Yükle
+      - name: APK Yukle
         if: always()
         uses: actions/upload-artifact@v4
         with:
