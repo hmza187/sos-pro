@@ -1,4 +1,4 @@
-name: MCHosting V9 - Orijinal Surum Fix
+name: MCHosting V10 - Gradlew Yok Fix
 
 on:
   workflow_dispatch:
@@ -15,12 +15,20 @@ jobs:
         run: |
           for z in *.zip; do [ -f "$z" ] && unzip -o "$z" && rm "$z"; done || true
           ls -la
-          find . -name "gradle-wrapper.properties" -exec cat {} \;
+          echo "=== ICERIK ==="
+          find . -type f -name "*.gradle" | head -20
+          ls -la MCHosting/ 2>/dev/null || true
+          ls -la SosApp/ 2>/dev/null || true
 
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Gradle Kur - Wrapper yoksa
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 7.6.3
 
       - name: SDK Kur
         run: |
@@ -30,66 +38,66 @@ jobs:
           yes | sdkmanager --licenses || true
           sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33" || true
 
-      - name: Versiyonlari Birlestir - 7.4.2 Sabitle
-        run: |
-          echo "=== Tum AGP surumleri 7.4.2 yapiliyor ==="
-          # Projedeki tum AGP versiyonlarini 7.4.2 yap
-          grep -r "com.android.tools.build:gradle" --include="*.gradle" . | head -20
-          find . -name "*.gradle" -type f -exec sed -i -E "s/com.android.tools.build:gradle:[0-9.]+/com.android.tools.build:gradle:7.4.2/g" {} \; || true
-          find . -name "*.gradle" -type f -exec sed -i -E "s/version '7.4.2'/version '7.4.2'/g" {} \; || true
-          # plugins blokundaki AGP
-          find . -name "*.gradle" -type f -exec sed -i -E "s/id 'com.android.application' version '[0-9.]+'/id 'com.android.application' version '7.4.2'/g" {} \; || true
-          grep -r "com.android.tools.build:gradle" --include="*.gradle" . | head -20
-          
-          echo "=== Gradle Wrapper 7.6.3 sabit ==="
-          find . -name "gradle-wrapper.properties" -exec sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.3-bin.zip|' {} \; || true
-          find . -name "gradle-wrapper.properties" -exec cat {} \; || true
-
       - name: Proje Hazirla
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
-          find . -name "gradlew" -type f -exec chmod +x {} \; || true
-          find . -name "gradlew" -type f | while read f; do dir=$(dirname "$f"); echo "sdk.dir=$ANDROID_HOME" > "$dir/local.properties"; done
-          echo "sdk.dir=$ANDROID_HOME" > local.properties || true
+          echo "sdk.dir=$ANDROID_HOME" | tee local.properties
+          echo "sdk.dir=$ANDROID_HOME" | tee MCHosting/local.properties 2>/dev/null || true
+          echo "sdk.dir=$ANDROID_HOME" | tee SosApp/local.properties 2>/dev/null || true
+          find . -name "local.properties" -exec cat {} \; 2>/dev/null || true
           
-          # dataBinding fix - AGP 7.x icin ESKI syntax
-          APP=$(find . -type f -path "*app/build.gradle" | head -1)
-          echo "APP=$APP"
-          if [ -f "$APP" ]; then
-            echo "=== Onceki APP ==="
-            cat "$APP" | head -100
-            # buildFeatures varsa sil, eski dataBinding ekle
-            if ! grep -q "dataBinding" "$APP"; then
-              python3 <<PY
-          import pathlib
-          p=pathlib.Path("$APP")
-          s=p.read_text()
-          # eski buildFeatures eklemesini temizle
-          # AGP 7.x icin dogru syntax: buildFeatures { dataBinding true } CALISIR ama bazen eski enabled lazim
-          # En uyumlu: android icine buildFeatures ekle
-          if "buildFeatures" not in s:
-              s=s.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }", 1)
-              p.write_text(s)
-              print("added buildFeatures")
-          PY
+          # Hangi klasor gercek proje? settings.gradle olan
+          for d in . MCHosting SosApp MCHosting/* SosApp/*; do
+            if [ -f "$d/settings.gradle" ] || [ -f "$d/settings.gradle.kts" ] || [ -f "$d/app/build.gradle" ]; then
+              echo "Proje bulundu: $d"
+              ls -la "$d" | head -20
             fi
-            echo "=== Sonraki APP ==="
-            cat "$APP" | head -200
-          fi
+          done
 
       - name: APK Derle
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-          GRADLEW=$(find . -type f -name "gradlew" | head -1)
-          echo "GRADLEW=$GRADLEW"
-          ROOT=$(dirname "$GRADLEW")
+          
+          # Gercek proje kokunu bul
+          if [ -f "MCHosting/app/build.gradle" ]; then
+            ROOT="MCHosting"
+          elif [ -f "SosApp/app/build.gradle" ]; then
+            ROOT="SosApp"
+          elif [ -f "app/build.gradle" ]; then
+            ROOT="."
+          else
+            ROOT=$(find . -name "app" -type d | head -1 | xargs dirname)
+          fi
+          
           echo "ROOT=$ROOT"
           cd "$ROOT"
           pwd
           ls -la
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          
+          # dataBinding fix
+          APP="app/build.gradle"
+          if [ -f "$APP" ] && ! grep -q "dataBinding" "$APP"; then
+            echo "dataBinding ekleniyor $APP"
+            python3 <<PY
+          import pathlib
+          p=pathlib.Path("app/build.gradle")
+          s=p.read_text()
+          if "buildFeatures" not in s:
+              s=s.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }",1)
+              p.write_text(s)
+          PY
+          fi
+          
+          # gradlew varsa onu, yoksa gradle
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --stacktrace --no-daemon
+          else
+            echo "gradlew yok, gradle komutu kullaniliyor"
+            gradle assembleDebug --stacktrace --no-daemon
+          fi
 
       - name: APK Yukle
         if: always()
