@@ -1,4 +1,4 @@
-name: MCHosting V11 - Settings Fix
+name: MCHosting V12 - useAndroidX Fix
 
 on:
   workflow_dispatch:
@@ -10,11 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: ZIP Ac
-        run: |
-          for z in *.zip; do [ -f "$z" ] && unzip -o "$z" && rm "$z"; done || true
-          ls -la MCHosting/ || true
+        run: for z in *.zip; do [ -f "$z" ] && unzip -o "$z" && rm "$z"; done || true
 
       - uses: actions/setup-java@v4
         with:
@@ -32,15 +29,10 @@ jobs:
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
           yes | sdkmanager --licenses || true
-          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33" || true
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33" "build-tools;30.0.3" || true
 
-      - name: Settings.gradle Duzelt
+      - name: Settings + Properties Duzelt
         run: |
-          echo "=== Onceki settings.gradle ==="
-          cat MCHosting/settings.gradle || cat settings.gradle || true
-          echo ""
-          echo "=== Yeni settings.gradle yaziliyor ==="
-          # MCHosting icin duzgun settings.gradle
           cat > MCHosting/settings.gradle <<'EOF'
           pluginManagement {
               repositories {
@@ -59,61 +51,41 @@ jobs:
           rootProject.name = "MCHosting"
           include ':app'
           EOF
-          cat MCHosting/settings.gradle
           
-          # Root settings.gradle de varsa duzelt
-          if [ -f "settings.gradle" ]; then
-            cat > settings.gradle <<'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          rootProject.name = "sos-pro"
-          include ':MCHosting:app'
+          # === EN ONEMLI FIX BURASI ===
+          cat > MCHosting/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.enableJetifier=true
+          android.suppressUnsupportedCompileSdk=34
+          android.nonTransitiveRClass=true
           EOF
-          fi
-
-      - name: Proje Hazirla
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          echo "sdk.dir=$ANDROID_HOME" | tee local.properties MCHosting/local.properties
           
-          # app/build.gradle dataBinding fix
-          if [ -f "MCHosting/app/build.gradle" ] && ! grep -q "dataBinding" MCHosting/app/build.gradle; then
+          cat MCHosting/gradle.properties
+          echo "sdk.dir=$ANDROID_HOME" | tee local.properties MCHosting/local.properties
+          echo "sdk.dir=/usr/local/lib/android/sdk" > MCHosting/local.properties
+
+      - name: dataBinding Fix
+        run: |
+          APP="MCHosting/app/build.gradle"
+          if ! grep -q "dataBinding" "$APP"; then
             python3 <<PY
           import pathlib
-          p=pathlib.Path("MCHosting/app/build.gradle")
+          p=pathlib.Path("$APP")
           s=p.read_text()
           if "buildFeatures" not in s:
               s=s.replace("android {", "android {\n    buildFeatures {\n        dataBinding true\n        viewBinding true\n    }",1)
               p.write_text(s)
-              print("added buildFeatures to MCHosting/app/build.gradle")
           PY
           fi
+          cat "$APP" | head -100
 
       - name: APK Derle
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-          
-          # ROOT MCHosting
           cd MCHosting
-          pwd
-          ls -la
-          echo "=== build.gradle ==="
-          cat build.gradle | head -30
-          
           gradle assembleDebug --stacktrace --no-daemon
 
       - name: APK Yukle
@@ -125,4 +97,3 @@ jobs:
             **/app/build/outputs/apk/debug/*.apk
             **/build/outputs/apk/debug/*.apk
             **/*.apk
-           
